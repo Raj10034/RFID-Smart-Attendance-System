@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timetable – RF Attendance</title>
+  <link rel="stylesheet" href="index.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">
+      <div class="brand-icon">🎓</div>
+      <div class="brand-text">
+        <span class="brand-name">RF Attendance</span>
+        <span class="brand-sub">Smart RFID System</span>
+      </div>
+    </a>
+    <ul class="navbar-nav">
+      <li><a href="dashboard.html">🏠 Dashboard</a></li>
+      <li><a href="attendance.html">📊 Attendance</a></li>
+      <li><a href="timetable.html" class="active">📅 Timetable</a></li>
+    </ul>
+    <div class="navbar-user" onclick="confirmLogout()">
+      <div class="avatar" id="nav-avatar">?</div>
+      <div class="user-info">
+        <span class="user-name" id="nav-name">Loading...</span>
+        <span class="user-role">Student</span>
+      </div>
+      <span style="color:var(--text-muted);margin-left:4px">⏻</span>
+    </div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div style="padding:1.5rem;max-width:1200px;margin:0 auto">
+      <div style="margin-bottom:1.5rem" class="fade-in">
+        <h1 style="font-size:1.5rem;font-weight:800">📅 Weekly Timetable</h1>
+        <p style="font-size:0.85rem;margin-top:4px">Your class schedule for the week</p>
+      </div>
+
+      <!-- Day tabs -->
+      <div class="tab-buttons" id="day-tabs">
+        <button class="tab-btn" onclick="filterDay('All', this)">All Days</button>
+        <button class="tab-btn" onclick="filterDay('Monday', this)">Mon</button>
+        <button class="tab-btn" onclick="filterDay('Tuesday', this)">Tue</button>
+        <button class="tab-btn" onclick="filterDay('Wednesday', this)">Wed</button>
+        <button class="tab-btn" onclick="filterDay('Thursday', this)">Thu</button>
+        <button class="tab-btn" onclick="filterDay('Friday', this)">Fri</button>
+      </div>
+
+      <div id="timetable-content" class="card fade-in">
+        <div class="empty-state"><div class="empty-icon">⏳</div><h3>Loading timetable...</h3></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="logout-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Sign Out</span>
+        <button class="modal-close" onclick="closeModal('logout-modal')">✕</button>
+      </div>
+      <p style="margin-bottom:1.5rem">Are you sure you want to sign out?</p>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="closeModal('logout-modal')">Cancel</button>
+        <button class="btn btn-danger" onclick="doLogout()">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allClasses = [];
+    const dayColors = { Monday: 'primary', Tuesday: 'info', Wednesday: 'success', Thursday: 'warning', Friday: 'danger' };
+
+    async function init() {
+      const authRes = await fetch('/api/me');
+      const auth = await authRes.json();
+      if (!auth.loggedIn || auth.role !== 'student') { window.location.href = '/login.html'; return; }
+
+      const initial = auth.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+      document.getElementById('nav-avatar').textContent = initial;
+      document.getElementById('nav-name').textContent = auth.user.name.split(' ')[0];
+
+      const res = await fetch('/api/student/timetable');
+      allClasses = await res.json();
+
+      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const today = days[new Date().getDay()];
+
+      // Highlight today's tab
+      const tabs = document.querySelectorAll('.tab-btn');
+      const todayTab = Array.from(tabs).find(t => t.textContent.trim().startsWith(today.slice(0,3)));
+      if (todayTab) { filterDay(today, todayTab); }
+      else { filterDay('All', tabs[0]); }
+    }
+
+    function filterDay(day, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const filtered = day === 'All' ? allClasses : allClasses.filter(c => c.day_of_week === day);
+      renderTimetable(filtered, day);
+    }
+
+    function renderTimetable(classes, day) {
+      const container = document.getElementById('timetable-content');
+      if (!classes.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎉</div><h3>No classes on this day!</h3></div>';
+        return;
+      }
+
+      if (day === 'All') {
+        const byDay = {};
+        classes.forEach(c => { if (!byDay[c.day_of_week]) byDay[c.day_of_week] = []; byDay[c.day_of_week].push(c); });
+        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        
+        container.innerHTML = dayOrder.filter(d => byDay[d]).map(d => `
+          <div style="margin-bottom:1.5rem">
+            <div class="section-title">${d}</div>
+            ${renderDayTable(byDay[d])}
+          </div>
+        `).join('');
+      } else {
+        container.innerHTML = renderDayTable(classes);
+      }
+    }
+
+    function renderDayTable(classes) {
+      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const today = days[new Date().getDay()];
+      const now = new Date();
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+
+      return `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Subject</th>
+              <th>Code</th>
+              <th>Faculty</th>
+              <th>Room</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${classes.map(c => {
+              const [sh, sm] = c.start_time.split(':').map(Number);
+              const [eh, em] = c.end_time.split(':').map(Number);
+              const isToday = c.day_of_week === today;
+              const isNow = isToday && nowMins >= sh*60+sm-10 && nowMins <= eh*60+em;
+              const isDone = isToday && nowMins > eh*60+em;
+
+              return `
+                <tr style="${isNow ? 'background:rgba(13,148,136,0.08)' : ''}">
+                  <td style="font-weight:600;color:var(--primary-light);white-space:nowrap">${c.start_time} – ${c.end_time}</td>
+                  <td style="font-weight:600;color:${isDone ? 'var(--text-muted)' : 'var(--text-primary)'}">${c.subject_name}</td>
+                  <td><span class="badge badge-primary">${c.subject_code}</span></td>
+                  <td style="color:var(--text-muted)">👤 ${c.faculty_name}</td>
+                  <td style="color:var(--text-muted)">📍 ${c.room}</td>
+                  <td>
+                    ${isNow ? '<span class="badge badge-success" style="animation:pulse 1.5s ease infinite">🔴 Live</span>' :
+                      isDone ? '<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted)">✓ Done</span>' :
+                      '<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted)">⏳ Upcoming</span>'}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function confirmLogout() { document.getElementById('logout-modal').classList.add('show'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+    async function doLogout() { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login.html'; }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance Details – RF Attendance</title>
+  <link rel="stylesheet" href="index.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">
+      <div class="brand-icon">🎓</div>
+      <div class="brand-text">
+        <span class="brand-name">RF Attendance</span>
+        <span class="brand-sub">Smart RFID System</span>
+      </div>
+    </a>
+    <ul class="navbar-nav">
+      <li><a href="dashboard.html" id="nav-home">🏠 Dashboard</a></li>
+      <li><a href="attendance.html" class="active" id="nav-att">📊 Attendance</a></li>
+      <li><a href="timetable.html" id="nav-tt">📅 Timetable</a></li>
+    </ul>
+    <div class="navbar-user" id="navbar-user" onclick="confirmLogout()">
+      <div class="avatar" id="nav-avatar">?</div>
+      <div class="user-info">
+        <span class="user-name" id="nav-name">Loading...</span>
+        <span class="user-role">Student</span>
+      </div>
+      <span style="color:var(--text-muted);margin-left:4px">⏻</span>
+    </div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div style="padding:1.5rem;max-width:1200px;margin:0 auto">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem" class="fade-in">
+        <div>
+          <h1 style="font-size:1.5rem;font-weight:800">📊 Attendance Report</h1>
+          <p style="font-size:0.85rem;margin-top:4px" id="att-subtitle">Subject-wise Attendance – <span id="student-name-header">...</span></p>
+        </div>
+        <div style="display:flex;gap:0.75rem">
+          <select class="form-control" id="month-filter" style="width:160px" onchange="applyFilters()">
+            <option value="">All Time</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Overall Stats -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
+        <div class="stat-card fade-in">
+          <div class="stat-icon primary">📊</div>
+          <div class="stat-info">
+            <div class="stat-value" id="s-pct">–%</div>
+            <div class="stat-label">Overall %</div>
+          </div>
+        </div>
+        <div class="stat-card fade-in" style="animation-delay:0.05s">
+          <div class="stat-icon info">📚</div>
+          <div class="stat-info">
+            <div class="stat-value" id="s-total">–</div>
+            <div class="stat-label">Total Classes</div>
+          </div>
+        </div>
+        <div class="stat-card fade-in" style="animation-delay:0.1s">
+          <div class="stat-icon success">✅</div>
+          <div class="stat-info">
+            <div class="stat-value" id="s-present">–</div>
+            <div class="stat-label">Attended</div>
+          </div>
+        </div>
+        <div class="stat-card fade-in" style="animation-delay:0.15s">
+          <div class="stat-icon danger">❌</div>
+          <div class="stat-info">
+            <div class="stat-value" id="s-absent">–</div>
+            <div class="stat-label">Absent</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subject Tabs + Detail View -->
+      <div class="card fade-in" style="animation-delay:0.2s">
+        <div class="card-header">
+          <div class="card-title"><div class="icon">📚</div> Subject Details</div>
+          <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.75rem;color:var(--text-muted)">
+            <span style="color:var(--success)">■</span> Present
+            <span style="color:var(--warning)">■</span> Late
+            <span style="color:var(--danger)">■</span> Absent
+          </div>
+        </div>
+        <div class="tab-buttons" id="subject-tabs"></div>
+        <div id="subject-detail">
+          <div class="empty-state"><div class="empty-icon">📊</div><h3>Select a subject above</h3></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toasts"></div>
+
+  <div class="modal-overlay" id="logout-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Sign Out</span>
+        <button class="modal-close" onclick="closeModal('logout-modal')">✕</button>
+      </div>
+      <p style="margin-bottom:1.5rem">Are you sure you want to sign out?</p>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="closeModal('logout-modal')">Cancel</button>
+        <button class="btn btn-danger" onclick="doLogout()">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allSubjects = [];
+    let activeSubjectId = null;
+
+    async function init() {
+      const res = await fetch('/api/me');
+      const data = await res.json();
+      if (!data.loggedIn || data.role !== 'student') { window.location.href = '/login.html'; return; }
+
+      const s = data.user;
+      const initial = s.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+      document.getElementById('nav-avatar').textContent = initial;
+      document.getElementById('nav-name').textContent = s.name.split(' ')[0];
+      document.getElementById('student-name-header').textContent = `${s.name} | ${s.enrollment_no} | Sem-${s.semester}`;
+
+      loadAttendanceSummary();
+    }
+
+    async function loadAttendanceSummary() {
+      const res = await fetch('/api/student/attendance');
+      const data = await res.json();
+
+      document.getElementById('s-pct').textContent = data.overall.percentage + '%';
+      document.getElementById('s-total').textContent = data.overall.total;
+      document.getElementById('s-present').textContent = data.overall.attended;
+      document.getElementById('s-absent').textContent = data.overall.total - data.overall.attended;
+
+      allSubjects = data.subjects;
+
+      // Build tabs
+      const tabs = document.getElementById('subject-tabs');
+      tabs.innerHTML = data.subjects.map((s, i) => `
+        <button class="tab-btn ${i===0?'active':''}" onclick="loadSubjectDetail(${s.id}, this)">${s.code}</button>
+      `).join('');
+
+      // Load first subject
+      if (data.subjects.length) loadSubjectDetail(data.subjects[0].id, tabs.querySelector('.tab-btn'));
+
+      // Month filter (last 6 months)
+      const sel = document.getElementById('month-filter');
+      for (let i = 0; i < 6; i++) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        const label = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+        sel.innerHTML += `<option value="${val}">${label}</option>`;
+      }
+    }
+
+    async function loadSubjectDetail(subjectId, btn) {
+      activeSubjectId = subjectId;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const container = document.getElementById('subject-detail');
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><h3>Loading records...</h3></div>';
+
+      const res = await fetch(`/api/student/attendance/${subjectId}`);
+      const data = await res.json();
+
+      const subjectSummary = allSubjects.find(s => s.id === subjectId);
+      const monthFilter = document.getElementById('month-filter').value;
+      let records = data.records;
+      if (monthFilter) records = records.filter(r => r.date.startsWith(monthFilter));
+
+      const present = records.filter(r => r.status === 'Present').length;
+      const late = records.filter(r => r.status === 'Late').length;
+      const absent = records.filter(r => r.status === 'Absent').length;
+
+      container.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;padding:1rem;background:var(--bg-card-hover);border-radius:14px">
+          <div>
+            <div style="font-size:1rem;font-weight:700">${data.subject?.name || 'Subject'}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">👤 ${data.subject?.faculty_name || '–'}</div>
+          </div>
+          <div style="display:flex;gap:1rem;font-size:0.8rem">
+            <span style="color:var(--success)">✅ ${present} Present</span>
+            <span style="color:var(--warning)">⚠️ ${late} Late</span>
+            <span style="color:var(--danger)">❌ ${absent} Absent</span>
+            <span class="badge badge-${subjectSummary?.status === 'good' ? 'success' : subjectSummary?.status === 'warning' ? 'warning' : 'danger'}">${subjectSummary?.percentage || 0}%</span>
+          </div>
+        </div>
+
+        ${records.length === 0 ? '<div class="empty-state"><div class="empty-icon">📋</div><h3>No attendance records found</h3></div>' : `
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Day</th>
+                <th>Time In</th>
+                <th>Status</th>
+                <th>Marked By</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${records.map((r, i) => {
+                const d = new Date(r.date);
+                const dayName = d.toLocaleDateString('en-IN', { weekday: 'short' });
+                const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                const statusClass = r.status === 'Present' ? 'badge-success' : r.status === 'Late' ? 'badge-warning' : 'badge-danger';
+                const statusIcon = r.status === 'Present' ? '✅' : r.status === 'Late' ? '⚠️' : '❌';
+                return `
+                  <tr>
+                    <td style="color:var(--text-muted)">${records.length - i}</td>
+                    <td style="font-weight:500;color:var(--text-primary)">${dateStr}</td>
+                    <td style="color:var(--text-muted)">${dayName}</td>
+                    <td style="font-family:monospace;color:var(--primary-light)">${r.time_in || '–'}</td>
+                    <td><span class="badge ${statusClass}">${statusIcon} ${r.status}</span></td>
+                    <td style="color:var(--text-muted)">📡 ${r.marked_by}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        `}
+      `;
+    }
+
+    function applyFilters() { if (activeSubjectId) loadSubjectDetail(activeSubjectId, document.querySelector('.tab-btn.active')); }
+    function confirmLogout() { document.getElementById('logout-modal').classList.add('show'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+    async function doLogout() { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login.html'; }
+
+    init();
+  </script>
+</body>
+</html>

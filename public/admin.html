@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel – RF Attendance</title>
+  <link rel="stylesheet" href="index.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="admin.html" class="navbar-brand">
+      <div class="brand-icon">⚙️</div>
+      <div class="brand-text">
+        <span class="brand-name">Admin Panel</span>
+        <span class="brand-sub">RF Attendance System</span>
+      </div>
+    </a>
+    <ul class="navbar-nav">
+      <li><a href="#" onclick="showSection('dashboard')" id="nav-dashboard" class="active">📊 Dashboard</a></li>
+      <li><a href="#" onclick="showSection('students')" id="nav-students">👥 Students</a></li>
+      <li><a href="#" onclick="showSection('attendance')" id="nav-attendance">📋 Attendance</a></li>
+      <li><a href="#" onclick="showSection('devices')" id="nav-devices">📡 Devices</a></li>
+    </ul>
+    <div class="navbar-user" onclick="doLogout()">
+      <div class="avatar">⚙️</div>
+      <div class="user-info">
+        <span class="user-name" id="nav-name">Admin</span>
+        <span class="user-role">Administrator</span>
+      </div>
+      <span style="color:var(--text-muted);margin-left:4px">⏻</span>
+    </div>
+  </nav>
+
+  <!-- LOGIN OVERLAY -->
+  <div id="admin-login-overlay" style="position:fixed;inset:0;background:var(--bg-dark);z-index:9999;display:flex;align-items:center;justify-content:center">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="logo-icon">⚙️</div>
+        <h1>Admin Login</h1>
+        <p>RF Attendance Management Panel</p>
+      </div>
+      <form onsubmit="adminLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input class="form-control" type="text" id="admin-user" placeholder="admin" value="admin">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input class="form-control" type="password" id="admin-pass" placeholder="admin123" value="">
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center" id="admin-login-btn">Login</button>
+        <div id="admin-login-err" style="display:none;margin-top:0.75rem;padding:0.75rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;font-size:0.8rem;color:var(--danger)"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="page-wrapper" id="main-content" style="display:none">
+    <div style="padding:1.5rem;max-width:1400px;margin:0 auto">
+
+      <!-- DASHBOARD SECTION -->
+      <div id="section-dashboard">
+        <h1 style="font-size:1.5rem;font-weight:800;margin-bottom:1.5rem" class="fade-in">📊 Admin Dashboard</h1>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
+          <div class="stat-card fade-in"><div class="stat-icon primary">👥</div><div class="stat-info"><div class="stat-value" id="stat-students">–</div><div class="stat-label">Total Students</div></div></div>
+          <div class="stat-card fade-in" style="animation-delay:0.05s"><div class="stat-icon info">📚</div><div class="stat-info"><div class="stat-value" id="stat-subjects">–</div><div class="stat-label">Subjects</div></div></div>
+          <div class="stat-card fade-in" style="animation-delay:0.1s"><div class="stat-icon success">✅</div><div class="stat-info"><div class="stat-value" id="stat-today">–</div><div class="stat-label">Today's Markings</div></div></div>
+          <div class="stat-card fade-in" style="animation-delay:0.15s"><div class="stat-icon warning">📡</div><div class="stat-info"><div class="stat-value" id="stat-total">–</div><div class="stat-label">Total Records</div></div></div>
+        </div>
+
+        <!-- ESP8266 API Info -->
+        <div class="card fade-in" style="animation-delay:0.2s;margin-bottom:1.5rem">
+          <div class="card-header">
+            <div class="card-title"><div class="icon">📡</div> ESP8266 RFID Endpoint</div>
+            <span class="badge badge-success"><span class="live-dot"></span> Active</span>
+          </div>
+          <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:1rem;font-family:monospace;font-size:0.8rem;color:var(--primary-light);overflow-x:auto">
+            <div style="color:var(--text-muted);margin-bottom:0.5rem">// POST Request from ESP8266:</div>
+            <div>POST <span style="color:var(--accent)">http://YOUR_SERVER_IP:3000/api/attendance/mark</span></div>
+            <div style="margin-top:0.5rem">Content-Type: application/json</div>
+            <div style="margin-top:0.5rem;color:var(--text-secondary)">{</div>
+            <div style="padding-left:1rem">"rfid_tag": <span style="color:var(--warning)">"RFID001"</span>,</div>
+            <div style="padding-left:1rem">"device_id": <span style="color:var(--warning)">"ESP01"</span>,</div>
+            <div style="padding-left:1rem">"secret_key": <span style="color:var(--warning)">"esp8266_secret_key_2024"</span></div>
+            <div>}</div>
+          </div>
+          <div style="margin-top:1rem;font-size:0.8rem;color:var(--text-muted)">The ESP8266 sends this request after reading an RFID card. The server automatically determines the current class and marks attendance.</div>
+        </div>
+        
+        <!-- Recent today's attendance -->
+        <div class="card fade-in" style="animation-delay:0.25s">
+          <div class="card-header">
+            <div class="card-title"><div class="icon">📋</div> Today's Attendance Log</div>
+            <button class="btn btn-outline btn-sm" onclick="showSection('attendance')">View All →</button>
+          </div>
+          <div id="today-log">
+            <div class="empty-state"><div class="empty-icon">⏳</div><h3>Loading...</h3></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STUDENTS SECTION -->
+      <div id="section-students" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem" class="fade-in">
+          <h1 style="font-size:1.5rem;font-weight:800">👥 Student Management</h1>
+          <button class="btn btn-primary" onclick="showAddStudent()">+ Add Student</button>
+        </div>
+        <div class="card fade-in">
+          <div style="display:flex;gap:1rem;margin-bottom:1rem">
+            <div class="search-box" style="flex:1">
+              🔍 <input type="text" id="student-search" placeholder="Search by name, enrollment, or email..." oninput="filterStudents()">
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Enrollment</th>
+                  <th>Email</th>
+                  <th>Branch/Sem</th>
+                  <th>RFID Tag</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="students-tbody">
+                <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-muted)">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ATTENDANCE SECTION -->
+      <div id="section-attendance" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem" class="fade-in">
+          <h1 style="font-size:1.5rem;font-weight:800">📋 Attendance Logs</h1>
+          <button class="btn btn-outline btn-sm" onclick="showManualMark()">✏️ Mark Manual</button>
+        </div>
+        <div class="card fade-in">
+          <div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
+            <input type="date" class="form-control" id="att-date" style="width:160px" onchange="loadAttendanceLogs()">
+            <select class="form-control" id="att-student" style="width:200px" onchange="loadAttendanceLogs()">
+              <option value="">All Students</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="clearAttFilters()">✕ Clear</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="data-table">
+              <thead>
+                <tr><th>Date</th><th>Student</th><th>Enrollment</th><th>Subject</th><th>Time In</th><th>Status</th><th>Marked By</th></tr>
+              </thead>
+              <tbody id="att-tbody">
+                <tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted)">Select filters to load records</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- DEVICES SECTION -->
+      <div id="section-devices" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem" class="fade-in">
+          <h1 style="font-size:1.5rem;font-weight:800">📡 RFID Devices</h1>
+          <button class="btn btn-primary" onclick="showAddDevice()">+ Add Device</button>
+        </div>
+        <div id="devices-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem">
+          <div class="empty-state"><div class="empty-icon">📡</div><h3>Loading devices...</h3></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Add Student Modal -->
+  <div class="modal-overlay" id="add-student-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">+ Add New Student</span>
+        <button class="modal-close" onclick="closeModal('add-student-modal')">✕</button>
+      </div>
+      <form onsubmit="addStudent(event)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+          <div class="form-group"><label class="form-label">Full Name *</label><input class="form-control" id="s-name" required placeholder="Aarav Mehta"></div>
+          <div class="form-group"><label class="form-label">Enrollment No *</label><input class="form-control" id="s-enroll" required placeholder="23BSCS01"></div>
+          <div class="form-group"><label class="form-label">Email *</label><input class="form-control" id="s-email" type="email" required placeholder="student@college.edu"></div>
+          <div class="form-group"><label class="form-label">Phone</label><input class="form-control" id="s-phone" placeholder="9876543210"></div>
+          <div class="form-group"><label class="form-label">Branch *</label><input class="form-control" id="s-branch" required placeholder="CS"></div>
+          <div class="form-group"><label class="form-label">Semester *</label><input class="form-control" id="s-sem" type="number" min="1" max="8" required value="6"></div>
+          <div class="form-group"><label class="form-label">RFID Tag</label><input class="form-control" id="s-rfid" placeholder="RFID004"></div>
+          <div class="form-group"><label class="form-label">Password</label><input class="form-control" id="s-pass" type="password" placeholder="student123 (default)"></div>
+        </div>
+        <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.5rem">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('add-student-modal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Student</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit RFID Modal -->
+  <div class="modal-overlay" id="edit-rfid-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">📡 Assign RFID Tag</span>
+        <button class="modal-close" onclick="closeModal('edit-rfid-modal')">✕</button>
+      </div>
+      <p style="margin-bottom:1rem;font-size:0.85rem">Assigning RFID to: <strong id="rfid-student-name" style="color:var(--primary-light)"></strong></p>
+      <div class="form-group">
+        <label class="form-label">RFID Tag</label>
+        <input class="form-control" id="new-rfid" placeholder="e.g. RFID004 or hex code">
+      </div>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="closeModal('edit-rfid-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveRfid()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Device Modal -->
+  <div class="modal-overlay" id="add-device-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">+ Add ESP8266 Device</span>
+        <button class="modal-close" onclick="closeModal('add-device-modal')">✕</button>
+      </div>
+      <div class="form-group"><label class="form-label">Device ID</label><input class="form-control" id="dev-id" placeholder="ESP02"></div>
+      <div class="form-group"><label class="form-label">Location</label><input class="form-control" id="dev-loc" placeholder="Lab Block - Room 201"></div>
+      <div class="form-group"><label class="form-label">Secret Key</label><input class="form-control" id="dev-key" placeholder="unique_secret_key" value="esp8266_secret_key_2024"></div>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="closeModal('add-device-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="addDevice()">Add Device</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual Attendance Modal -->
+  <div class="modal-overlay" id="manual-att-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">✏️ Manual Attendance</span>
+        <button class="modal-close" onclick="closeModal('manual-att-modal')">✕</button>
+      </div>
+      <div class="form-group"><label class="form-label">Student</label><select class="form-control" id="m-student"></select></div>
+      <div class="form-group"><label class="form-label">Subject</label><select class="form-control" id="m-subject"></select></div>
+      <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-control" id="m-date"></div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-control" id="m-status">
+          <option value="Present">Present</option>
+          <option value="Late">Late</option>
+          <option value="Absent">Absent</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="closeModal('manual-att-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitManualAtt()">Mark Attendance</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toasts"></div>
+
+  <script>
+    let allStudents = [];
+    let editingStudentId = null;
+
+    async function adminLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById('admin-login-btn');
+      btn.disabled = true; btn.textContent = 'Logging in...';
+
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: document.getElementById('admin-user').value, password: document.getElementById('admin-pass').value })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        document.getElementById('admin-login-err').textContent = '⚠️ ' + data.error;
+        document.getElementById('admin-login-err').style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Login';
+        return;
+      }
+
+      document.getElementById('admin-login-overlay').style.display = 'none';
+      document.getElementById('main-content').style.display = 'block';
+      document.getElementById('nav-name').textContent = data.admin.name;
+      initAdmin();
+    }
+
+    async function init() {
+      const res = await fetch('/api/me');
+      const data = await res.json();
+      if (data.loggedIn && data.role === 'admin') {
+        document.getElementById('admin-login-overlay').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('nav-name').textContent = data.user.name;
+        initAdmin();
+      }
+    }
+
+    function initAdmin() {
+      loadStats();
+      loadTodayLog();
+      loadStudents();
+      loadAttendanceStudentFilter();
+      loadDevices();
+    }
+
+    async function loadStats() {
+      const res = await fetch('/api/admin/stats');
+      const d = await res.json();
+      document.getElementById('stat-students').textContent = d.totalStudents;
+      document.getElementById('stat-subjects').textContent = d.totalSubjects;
+      document.getElementById('stat-today').textContent = d.todayAttendance;
+      document.getElementById('stat-total').textContent = d.totalAttendance;
+    }
+
+    async function loadTodayLog() {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await fetch(`/api/admin/attendance?date=${today}`);
+      const records = await res.json();
+      const tbody = document.getElementById('today-log');
+
+      if (!records.length) {
+        tbody.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>No attendance marked today yet</h3></div>';
+        return;
+      }
+
+      tbody.innerHTML = `<div style="overflow-x:auto"><table class="data-table">
+        <thead><tr><th>Time</th><th>Student</th><th>Enrollment</th><th>Subject</th><th>Status</th></tr></thead>
+        <tbody>${records.slice(0,10).map(r => `
+          <tr>
+            <td style="font-family:monospace;color:var(--primary-light)">${r.time_in || '–'}</td>
+            <td style="font-weight:600;color:var(--text-primary)">${r.student_name}</td>
+            <td style="color:var(--text-muted)">${r.enrollment_no}</td>
+            <td>${r.subject_name} <span class="badge badge-primary" style="font-size:0.65rem">${r.code}</span></td>
+            <td><span class="badge ${r.status==='Present'?'badge-success':r.status==='Late'?'badge-warning':'badge-danger'}">${r.status}</span></td>
+          </tr>
+        `).join('')}</tbody>
+      </table></div>`;
+    }
+
+    async function loadStudents() {
+      const res = await fetch('/api/admin/students');
+      allStudents = await res.json();
+      renderStudents(allStudents);
+    }
+
+    function renderStudents(students) {
+      document.getElementById('students-tbody').innerHTML = students.map((s, i) => `
+        <tr>
+          <td style="color:var(--text-muted)">${i+1}</td>
+          <td style="font-weight:600;color:var(--text-primary)">${s.name}</td>
+          <td style="color:var(--primary-light);font-weight:600">${s.enrollment_no}</td>
+          <td style="color:var(--text-muted);font-size:0.8rem">${s.email}</td>
+          <td><span class="badge badge-primary">${s.branch}</span> Sem ${s.semester}</td>
+          <td>${s.rfid_tag ? `<span class="badge badge-success">📡 ${s.rfid_tag}</span>` : '<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted)">Not assigned</span>'}</td>
+          <td><span class="badge badge-${s.status==='Active'?'success':'danger'}">${s.status}</span></td>
+          <td><div style="display:flex;gap:0.5rem">
+            <button class="btn btn-outline btn-sm" onclick="editRfid(${s.id},'${s.name}')">📡 RFID</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})">✕</button>
+          </div></td>
+        </tr>
+      `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">No students found</td></tr>';
+    }
+
+    function filterStudents() {
+      const q = document.getElementById('student-search').value.toLowerCase();
+      const filtered = allStudents.filter(s =>
+        s.name.toLowerCase().includes(q) ||
+        s.enrollment_no.toLowerCase().includes(q) ||
+        s.email.toLowerCase().includes(q)
+      );
+      renderStudents(filtered);
+    }
+
+    function showAddStudent() { openModal('add-student-modal'); }
+
+    async function addStudent(e) {
+      e.preventDefault();
+      const body = {
+        name: document.getElementById('s-name').value,
+        enrollment_no: document.getElementById('s-enroll').value,
+        email: document.getElementById('s-email').value,
+        password: document.getElementById('s-pass').value || 'student123',
+        rfid_tag: document.getElementById('s-rfid').value || null,
+        branch: document.getElementById('s-branch').value,
+        semester: parseInt(document.getElementById('s-sem').value),
+        phone: document.getElementById('s-phone').value,
+        year: new Date().getFullYear()
+      };
+      const res = await fetch('/api/admin/students', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        closeModal('add-student-modal');
+        showToast('Student added successfully!', 'success');
+        loadStudents();
+        e.target.reset();
+      } else {
+        showToast('Error: ' + data.error, 'error');
+      }
+    }
+
+    function editRfid(id, name) {
+      editingStudentId = id;
+      document.getElementById('rfid-student-name').textContent = name;
+      document.getElementById('new-rfid').value = '';
+      openModal('edit-rfid-modal');
+    }
+
+    async function saveRfid() {
+      const rfid = document.getElementById('new-rfid').value.trim().toUpperCase();
+      if (!rfid) return showToast('Enter a valid RFID tag', 'error');
+      const res = await fetch(`/api/admin/students/${editingStudentId}/rfid`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rfid_tag: rfid })
+      });
+      const data = await res.json();
+      if (data.success) { closeModal('edit-rfid-modal'); showToast('RFID assigned!', 'success'); loadStudents(); }
+      else showToast('Error: ' + data.error, 'error');
+    }
+
+    async function deleteStudent(id) {
+      if (!confirm('Delete this student? This action cannot be undone.')) return;
+      await fetch(`/api/admin/students/${id}`, { method: 'DELETE' });
+      showToast('Student deleted', 'info');
+      loadStudents();
+    }
+
+    async function loadAttendanceLogs() {
+      const date = document.getElementById('att-date').value;
+      const studentId = document.getElementById('att-student').value;
+      let url = '/api/admin/attendance?';
+      if (date) url += `date=${date}&`;
+      if (studentId) url += `student_id=${studentId}&`;
+
+      const res = await fetch(url);
+      const records = await res.json();
+
+      document.getElementById('att-tbody').innerHTML = records.map(r => `
+        <tr>
+          <td style="font-weight:500">${formatDate(r.date)}</td>
+          <td style="font-weight:600;color:var(--text-primary)">${r.student_name}</td>
+          <td style="color:var(--text-muted)">${r.enrollment_no}</td>
+          <td>${r.subject_name} <span class="badge badge-primary" style="font-size:0.65rem">${r.subject_code}</span></td>
+          <td style="font-family:monospace;color:var(--primary-light)">${r.time_in || '–'}</td>
+          <td><span class="badge ${r.status==='Present'?'badge-success':r.status==='Late'?'badge-warning':'badge-danger'}">${r.status}</span></td>
+          <td style="color:var(--text-muted)">📡 ${r.marked_by}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem">No records found</td></tr>';
+    }
+
+    async function loadAttendanceStudentFilter() {
+      const res = await fetch('/api/admin/students');
+      const students = await res.json();
+      const sel = document.getElementById('att-student');
+      students.forEach(s => sel.innerHTML += `<option value="${s.id}">${s.name} (${s.enrollment_no})</option>`);
+
+      // Also fill manual attendance modal
+      const mSel = document.getElementById('m-student');
+      students.forEach(s => mSel.innerHTML += `<option value="${s.id}">${s.name}</option>`);
+
+      const subRes = await fetch('/api/admin/subjects');
+      const subjects = await subRes.json();
+      const sSel = document.getElementById('m-subject');
+      subjects.forEach(s => sSel.innerHTML += `<option value="${s.id}">${s.name} (${s.code})</option>`);
+    }
+
+    function clearAttFilters() {
+      document.getElementById('att-date').value = '';
+      document.getElementById('att-student').value = '';
+      document.getElementById('att-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted)">Select filters to load records</td></tr>';
+    }
+
+    function showManualMark() {
+      document.getElementById('m-date').value = new Date().toISOString().split('T')[0];
+      openModal('manual-att-modal');
+    }
+
+    async function submitManualAtt() {
+      const body = {
+        student_id: document.getElementById('m-student').value,
+        subject_id: document.getElementById('m-subject').value,
+        date: document.getElementById('m-date').value,
+        status: document.getElementById('m-status').value
+      };
+      const res = await fetch('/api/admin/attendance/manual', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) { closeModal('manual-att-modal'); showToast('Attendance marked!', 'success'); loadStats(); }
+      else showToast('Error: ' + data.error, 'error');
+    }
+
+    async function loadDevices() {
+      const res = await fetch('/api/admin/devices');
+      const devices = await res.json();
+      document.getElementById('devices-grid').innerHTML = devices.length ? devices.map(d => `
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
+            <div style="width:48px;height:48px;background:rgba(13,148,136,0.15);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.5rem">📡</div>
+            <div>
+              <div style="font-weight:700;color:var(--text-primary)">${d.device_id}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">${d.location}</div>
+            </div>
+          </div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem">
+            <strong style="color:var(--text-secondary)">Key:</strong> <code style="color:var(--primary-light)">${d.secret_key}</code>
+          </div>
+          <div style="font-size:0.75rem;color:var(--text-muted)">
+            <strong style="color:var(--text-secondary)">Last seen:</strong> ${d.last_seen ? formatDate(d.last_seen.split('T')[0]) : 'Never'}
+          </div>
+          <div style="margin-top:0.75rem">
+            <span class="badge badge-${d.status==='active'?'success':'danger'}">${d.status}</span>
+          </div>
+        </div>
+      `).join('') : '<div class="empty-state"><div class="empty-icon">📡</div><h3>No devices registered</h3></div>';
+    }
+
+    function showAddDevice() { openModal('add-device-modal'); }
+
+    async function addDevice() {
+      const body = {
+        device_id: document.getElementById('dev-id').value,
+        location: document.getElementById('dev-loc').value,
+        secret_key: document.getElementById('dev-key').value
+      };
+      const res = await fetch('/api/admin/devices', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) { closeModal('add-device-modal'); showToast('Device added!', 'success'); loadDevices(); }
+      else showToast('Error: ' + data.error, 'error');
+    }
+
+    function showSection(name) {
+      ['dashboard', 'students', 'attendance', 'devices'].forEach(s => {
+        document.getElementById(`section-${s}`).style.display = s === name ? 'block' : 'none';
+        document.getElementById(`nav-${s}`).classList.toggle('active', s === name);
+      });
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('show'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+    function showToast(msg, type = 'info') {
+      const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+      document.getElementById('toasts').appendChild(t);
+      setTimeout(() => { t.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    function formatDate(d) {
+      if (!d) return '–';
+      return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    async function doLogout() { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login.html'; }
+
+    init();
+  </script>
+</body>
+</html>

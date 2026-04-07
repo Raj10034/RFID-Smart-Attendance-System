@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard – RF Attendance</title>
+  <meta name="description" content="View your attendance, today's timetable, and notifications on the RF Attendance student dashboard.">
+  <link rel="stylesheet" href="index.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">
+      <div class="brand-icon">🎓</div>
+      <div class="brand-text">
+        <span class="brand-name">RF Attendance</span>
+        <span class="brand-sub">Smart RFID System</span>
+      </div>
+    </a>
+
+    <ul class="navbar-nav">
+      <li><a href="dashboard.html" class="active" id="nav-home">🏠 Dashboard</a></li>
+      <li><a href="attendance.html" id="nav-att">📊 Attendance</a></li>
+      <li><a href="timetable.html" id="nav-tt">📅 Timetable</a></li>
+    </ul>
+
+    <div class="navbar-user" id="navbar-user" onclick="confirmLogout()">
+      <div class="avatar" id="nav-avatar">?</div>
+      <div class="user-info">
+        <span class="user-name" id="nav-name">Loading...</span>
+        <span class="user-role">Student</span>
+      </div>
+      <span style="color:var(--text-muted);margin-left:4px">⏻</span>
+    </div>
+  </nav>
+
+  <div class="page-wrapper">
+    <div class="dashboard-layout">
+      <!-- LEFT SIDEBAR -->
+      <aside class="left-sidebar">
+        <div class="sidebar-scroll">
+          <!-- Greeting -->
+          <div class="greet-card">
+            <div class="greet-time" id="greet-time">Good Morning! ☀️</div>
+            <div class="greet-name">Hi, <span id="greet-name">...</span>!</div>
+            <div class="greet-msg">Have a great day at college.</div>
+          </div>
+
+          <!-- Today's Courses -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="icon">📚</div> Today's Classes</div>
+              <span id="today-day" class="badge badge-primary"></span>
+            </div>
+            <div id="today-classes">
+              <div class="empty-state"><div class="empty-icon">🗓️</div><h3>Loading schedule...</h3></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main>
+        <!-- Stats Row -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem">
+          <div class="stat-card fade-in">
+            <div class="stat-icon primary">📊</div>
+            <div class="stat-info">
+              <div class="stat-value" id="overall-pct">–%</div>
+              <div class="stat-label">Overall Attendance</div>
+            </div>
+          </div>
+          <div class="stat-card fade-in" style="animation-delay:0.1s">
+            <div class="stat-icon success">✅</div>
+            <div class="stat-info">
+              <div class="stat-value" id="total-present">–</div>
+              <div class="stat-label">Classes Attended</div>
+            </div>
+          </div>
+          <div class="stat-card fade-in" style="animation-delay:0.2s">
+            <div class="stat-icon danger">❌</div>
+            <div class="stat-info">
+              <div class="stat-value" id="total-absent">–</div>
+              <div class="stat-label">Classes Missed</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Profile card + mentor -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+          <div class="profile-card fade-in" style="animation-delay:0.15s">
+            <div class="profile-avatar" id="profile-avatar">?</div>
+            <div class="profile-name" id="profile-name">...</div>
+            <div class="profile-enrollment" id="profile-enrollment">Loading...</div>
+            <span class="badge badge-success" style="margin:0.5rem auto 0;display:inline-flex">● Active</span>
+            <div class="profile-details">
+              <div class="profile-detail-row">🏫 <strong>Branch</strong><span id="profile-branch">–</span></div>
+              <div class="profile-detail-row">📅 <strong>Semester</strong><span id="profile-semester">–</span></div>
+              <div class="profile-detail-row">📧 <strong>Email</strong><span id="profile-email" style="font-size:0.7rem;overflow:hidden;text-overflow:ellipsis">–</span></div>
+            </div>
+          </div>
+
+          <!-- Attendance warning card -->
+          <div class="card fade-in" style="animation-delay:0.2s">
+            <div class="card-header">
+              <div class="card-title"><div class="icon">⚠️</div> Attendance Alert</div>
+            </div>
+            <div id="att-alerts">
+              <div class="empty-state"><div class="empty-icon">📊</div><h3>Loading...</h3></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subject-wise Attendance -->
+        <div class="card fade-in" style="animation-delay:0.25s">
+          <div class="card-header">
+            <div class="card-title"><div class="icon">📚</div> Subject-wise Attendance</div>
+            <a href="attendance.html" class="btn btn-outline btn-sm">View Details →</a>
+          </div>
+          <div id="subjects-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem">
+            <div class="empty-state"><div class="empty-icon">📊</div><h3>Loading subjects...</h3></div>
+          </div>
+        </div>
+      </main>
+
+      <!-- RIGHT SIDEBAR -->
+      <aside class="right-sidebar">
+        <div class="sidebar-scroll">
+          <!-- Quick RFID info -->
+          <div class="card" style="margin-bottom:1rem;background:linear-gradient(135deg,rgba(13,148,136,0.12),rgba(6,182,212,0.06))">
+            <div class="card-title" style="margin-bottom:0.75rem"><div class="icon">📡</div> RFID System</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);line-height:1.6">
+              Your attendance is automatically marked when you tap your RFID card on the ESP8266 reader at class entry.
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.75rem;font-size:0.75rem;color:var(--success)">
+              <span class="live-dot"></span> System Online
+            </div>
+          </div>
+
+          <!-- Notifications -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="icon">🔔</div> Recent Activity</div>
+              <span class="badge badge-primary" id="notif-count">0</span>
+            </div>
+            <div id="notifications-list">
+              <div class="empty-state"><div class="empty-icon">🔔</div><h3>Loading...</h3></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toasts"></div>
+
+  <!-- Logout modal -->
+  <div class="modal-overlay" id="logout-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Sign Out</span>
+        <button class="modal-close" onclick="closeModal('logout-modal')">✕</button>
+      </div>
+      <p style="margin-bottom:1.5rem">Are you sure you want to sign out of RF Attendance?</p>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="closeModal('logout-modal')">Cancel</button>
+        <button class="btn btn-danger" onclick="doLogout()">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let studentData = null;
+
+    // ===== Auth Check =====
+    async function init() {
+      try {
+        const res = await fetch('/api/me');
+        const data = await res.json();
+        if (!data.loggedIn || data.role !== 'student') {
+          window.location.href = '/login.html';
+          return;
+        }
+        studentData = data.user;
+        renderProfile();
+        loadTodayClasses();
+        loadAttendance();
+        loadNotifications();
+      } catch (e) {
+        window.location.href = '/login.html';
+      }
+    }
+
+    function renderProfile() {
+      const s = studentData;
+      const initial = s.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
+      document.getElementById('nav-avatar').textContent = initial;
+      document.getElementById('nav-name').textContent = s.name.split(' ')[0];
+      document.getElementById('greet-name').textContent = s.name.split(' ')[0];
+      document.getElementById('profile-avatar').textContent = initial;
+      document.getElementById('profile-name').textContent = s.name;
+      document.getElementById('profile-enrollment').textContent = s.enrollment_no;
+      document.getElementById('profile-branch').textContent = s.branch + ' Engineering';
+      document.getElementById('profile-semester').textContent = 'Semester ' + s.semester;
+      document.getElementById('profile-email').textContent = s.email;
+
+      // Greeting by time
+      const h = new Date().getHours();
+      const greets = [[5,'Good Morning! ☀️'], [12,'Good Afternoon! 🌤️'], [17,'Good Evening! 🌇'], [21,'Good Night! 🌙'], [24,'Good Night! 🌙']];
+      const g = greets.find(([end]) => h < end);
+      if (g) document.getElementById('greet-time').textContent = g[1];
+    }
+
+    async function loadTodayClasses() {
+      try {
+        const res = await fetch('/api/student/timetable/today');
+        const data = await res.json();
+        const container = document.getElementById('today-classes');
+        document.getElementById('today-day').textContent = data.day;
+
+        if (!data.classes.length) {
+          container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎉</div><h3>No classes today!</h3></div>';
+          return;
+        }
+
+        const now = new Date();
+        const nowMins = now.getHours() * 60 + now.getMinutes();
+
+        container.innerHTML = data.classes.map(cls => {
+          const [sh, sm] = cls.start_time.split(':').map(Number);
+          const [eh, em] = cls.end_time.split(':').map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          const isNow = nowMins >= startMins - 10 && nowMins <= endMins;
+          const isDone = nowMins > endMins;
+
+          return `
+            <div class="course-card ${isNow ? 'active' : ''}">
+              ${isNow ? '<div style="font-size:0.65rem;color:var(--success);font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="live-dot"></span> ONGOING</div>' : ''}
+              <div class="course-name" style="${isDone ? 'opacity:0.5' : ''}">${cls.subject_name}</div>
+              <div class="course-time">🕐 ${cls.start_time} – ${cls.end_time}</div>
+              <div class="course-meta">
+                <span>📖 ${cls.subject_code}</span>
+              </div>
+              <div class="course-room">📍 ${cls.room} | 👤 ${cls.faculty_name}</div>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadAttendance() {
+      try {
+        const res = await fetch('/api/student/attendance');
+        const data = await res.json();
+
+        // Overall stats
+        document.getElementById('overall-pct').textContent = data.overall.percentage + '%';
+        document.getElementById('total-present').textContent = data.overall.attended;
+        document.getElementById('total-absent').textContent = data.overall.total - data.overall.attended;
+
+        // Alerts
+        const alerts = data.subjects.filter(s => s.percentage < 75);
+        const alertsDiv = document.getElementById('att-alerts');
+        if (!alerts.length) {
+          alertsDiv.innerHTML = '<div style="text-align:center;padding:1rem"><div style="font-size:2rem">✅</div><div style="font-size:0.85rem;color:var(--success);font-weight:600;margin-top:0.5rem">Attendance is on track!</div><div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">All subjects above 75%</div></div>';
+        } else {
+          alertsDiv.innerHTML = alerts.map(s => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0.75rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:10px;margin-bottom:0.5rem">
+              <div>
+                <div style="font-size:0.8rem;font-weight:600;color:var(--text-primary)">${s.name}</div>
+                <div style="font-size:0.7rem;color:var(--text-muted)">Need ${Math.ceil((0.75 * s.total_classes - s.attended) / 0.25)} more classes</div>
+              </div>
+              <span class="badge badge-danger">${s.percentage}%</span>
+            </div>
+          `).join('');
+        }
+
+        // Subject grid
+        const grid = document.getElementById('subjects-grid');
+        grid.innerHTML = data.subjects.map(s => `
+          <div class="subject-card" onclick="window.location.href='attendance.html?subject=${s.id}'">
+            <div class="subject-header">
+              <div>
+                <div class="subject-code">${s.code}</div>
+                <div class="subject-name">${s.name}</div>
+                <div class="subject-faculty">👤 ${s.faculty_name}</div>
+              </div>
+              <div class="attendance-pct pct-${s.status}">${s.percentage}%</div>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill ${s.status}" style="width:${s.percentage}%"></div>
+            </div>
+            <div class="attendance-counts">
+              <span>✅ ${s.attended} Present</span>
+              <span>❌ ${s.absent} Absent</span>
+              <span>📚 ${s.total_classes} Total</span>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadNotifications() {
+      try {
+        const res = await fetch('/api/student/notifications');
+        const data = await res.json();
+        const list = document.getElementById('notifications-list');
+        const count = data.recent_attendance.length + data.notifications.length;
+        document.getElementById('notif-count').textContent = count;
+
+        const items = [];
+
+        // Recent attendance marks
+        data.recent_attendance.forEach(a => {
+          const statusIcon = a.status === 'Present' ? '✅' : a.status === 'Late' ? '⚠️' : '❌';
+          items.push(`
+            <div class="notification-item">
+              <div class="notification-date">${formatDate(a.date)}</div>
+              <div class="notification-title">${statusIcon} ${a.subject_name}</div>
+              <div class="notification-msg">Marked ${a.status} at ${a.time_in || 'N/A'} via RFID</div>
+            </div>
+          `);
+        });
+
+        // System notifications
+        data.notifications.forEach(n => {
+          items.push(`
+            <div class="notification-item">
+              <div class="notification-date">${formatDate(n.created_at?.split('T')[0] || '')}</div>
+              <div class="notification-title">🔔 ${n.title}</div>
+              <div class="notification-msg">${n.message}</div>
+            </div>
+          `);
+        });
+
+        list.innerHTML = items.length ? items.join('') : '<div class="empty-state"><div class="empty-icon">🔔</div><h3>No recent activity</h3></div>';
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function formatDate(d) {
+      if (!d) return '';
+      const date = new Date(d);
+      return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function confirmLogout() {
+      document.getElementById('logout-modal').classList.add('show');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('show');
+    }
+
+    async function doLogout() {
+      await fetch('/api/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    }
+
+    init();
+  </script>
+</body>
+</html>

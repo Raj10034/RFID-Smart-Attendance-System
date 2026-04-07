@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RF Attendance System – Login</title>
+  <meta name="description" content="Student attendance portal powered by RFID and ESP8266. View your attendance, timetable, and more.">
+  <link rel="stylesheet" href="index.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+</head>
+<body>
+  <div class="login-bg">
+    <!-- Animated circles -->
+    <div style="position:absolute;width:300px;height:300px;border:1px solid rgba(13,148,136,0.1);border-radius:50%;animation:spin 20s linear infinite;top:10%;right:10%;"></div>
+    <div style="position:absolute;width:200px;height:200px;border:1px solid rgba(6,182,212,0.08);border-radius:50%;animation:spin 15s linear infinite reverse;bottom:20%;left:15%;"></div>
+    
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="logo-icon">🎓</div>
+        <h1>RF Attendance</h1>
+        <p>Smart RFID-based Attendance System</p>
+      </div>
+
+      <div class="login-tabs">
+        <button class="login-tab active" id="tab-student" onclick="switchTab('student')">Student</button>
+        <button class="login-tab" id="tab-admin" onclick="switchTab('admin')">Admin</button>
+      </div>
+
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div id="student-form">
+          <div class="form-group">
+            <label class="form-label" for="email">📧 Email Address</label>
+            <input class="form-control" type="email" id="email" placeholder="student@student.edu" value="" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="password">🔒 Password</label>
+            <input class="form-control" type="password" id="password" placeholder="Enter your password" value="" autocomplete="current-password">
+          </div>
+        </div>
+
+        <div id="admin-form" style="display:none">
+          <div class="form-group">
+            <label class="form-label" for="admin-username">👤 Username</label>
+            <input class="form-control" type="text" id="admin-username" placeholder="admin" autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admin-password">🔒 Password</label>
+            <input class="form-control" type="password" id="admin-password" placeholder="Enter admin password" autocomplete="current-password">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg" id="login-btn" style="width:100%;justify-content:center;margin-top:0.5rem">
+          <span id="login-text">Sign In</span>
+        </button>
+      </form>
+
+      <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border);">
+        <div class="section-title">Demo Credentials</div>
+        <div style="display:flex;flex-direction:column;gap:0.4rem;font-size:0.75rem;color:var(--text-muted);">
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <span class="badge badge-primary">Student</span>
+            <span>aarav@student.edu</span>
+            <span style="color:var(--border)">•</span>
+            <span>student123</span>
+          </div>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <span class="badge badge-warning">Admin</span>
+            <span>admin</span>
+            <span style="color:var(--border)">•</span>
+            <span>admin123</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="login-error" style="display:none;margin-top:1rem;padding:0.75rem 1rem;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;font-size:0.8rem;color:var(--danger)"></div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toasts"></div>
+
+  <script>
+    let currentTab = 'student';
+
+    // Check if already logged in
+    fetch('/api/me').then(r => r.json()).then(d => {
+      if (d.loggedIn) {
+        if (d.role === 'admin') window.location.href = '/admin.html';
+        else window.location.href = '/dashboard.html';
+      }
+    }).catch(() => {});
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('tab-student').classList.toggle('active', tab === 'student');
+      document.getElementById('tab-admin').classList.toggle('active', tab === 'admin');
+      document.getElementById('student-form').style.display = tab === 'student' ? 'block' : 'none';
+      document.getElementById('admin-form').style.display = tab === 'admin' ? 'block' : 'none';
+      document.getElementById('login-error').style.display = 'none';
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById('login-btn');
+      const errDiv = document.getElementById('login-error');
+      errDiv.style.display = 'none';
+
+      btn.disabled = true;
+      document.getElementById('login-text').innerHTML = '<span class="spinner"></span> Signing in...';
+
+      try {
+        let body, url;
+        if (currentTab === 'student') {
+          body = {
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value
+          };
+          url = '/api/login';
+        } else {
+          body = {
+            username: document.getElementById('admin-username').value,
+            password: document.getElementById('admin-password').value
+          };
+          url = '/api/admin/login';
+        }
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Login failed');
+
+        window.location.href = currentTab === 'admin' ? '/admin.html' : '/dashboard.html';
+      } catch (err) {
+        errDiv.textContent = '⚠️ ' + err.message;
+        errDiv.style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('login-text').textContent = 'Sign In';
+      }
+    }
+  </script>
+</body>
+</html>
